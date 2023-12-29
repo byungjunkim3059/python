@@ -2,47 +2,46 @@ import pandas as pd
 import xlrd
 import tkinter as tk
 from tkinter import filedialog
-
-import openpyxl
 from openpyxl.styles import Font
 from openpyxl.styles import Alignment
-from openpyxl.styles import Border, Side
 
-import os
-import shutil
-from datetime import datetime
 
 root = tk.Tk()
 root.withdraw()
 
 file_path = filedialog.askopenfilename(filetypes=[("Excel Files", "*.xls")])
 
+def convert_xls_to_xlsx(input_file, output_file):
+    # xls 파일을 DataFrame으로 읽기
+    df = pd.read_excel(input_file, sheet_name=None)
+
+    # ExcelWriter 객체 생성
+    with pd.ExcelWriter(output_file, engine='xlsxwriter') as writer:
+        # DataFrame을 각각의 시트로 쓰기
+        for sheet, data in df.items():
+            data.to_excel(writer, sheet_name=sheet, index=False)
+
+if __name__ == "__main__":
+    # 파일 선택
+    input_file_path = file_path
+
+    if not input_file_path:
+        print("No file selected. Exiting.")
+    else:
+        # 변환할 파일의 경로 출력
+        print(f"Selected file: {input_file_path}")
+
+        # 파일 이름과 경로에서 확장자를 바꿔서 출력 파일 경로 생성
+        output_file_path = ".".join(input_file_path.split(".")[:-1]) + "_쉽핑마크_데이터.xlsx"
+
+        # 함수 호출하여 변환 수행
+        convert_xls_to_xlsx(input_file_path, output_file_path)
+
+        print(f"Conversion complete. Output file saved at: {output_file_path}")
 
 if file_path:
     try:
         df = pd.read_excel(file_path, engine="xlrd")
-
-
-        # 고객명 도출
-        customer_row_indices = df[df.apply(lambda row: row.astype(str).str.contains('수         신 :').any(), axis=1)].index
-        customer_columns_indices = [i for i, col in enumerate(df.columns) if df[col].astype(str).str.contains('수         신 :').any()]    
-
-        customer_row_index = customer_row_indices[0]
-        customer_column_index = customer_columns_indices[0]
-
-        customer_info = df.iloc[customer_row_index, customer_column_index + 1]    
-
-        # 출고일 도출
-        outbound_date_row_indices = df[df.apply(lambda row: row.astype(str).str.contains('입   고   일:').any(), axis=1)].index
-        outbound_date_columns_indices = [i for i, col in enumerate(df.columns) if df[col].astype(str).str.contains('입   고   일:').any()]    
-
-        outbound_date_row_index = outbound_date_row_indices[0]
-        outbound_date_column_index = outbound_date_columns_indices[0]
-
-        outbound_date_info = df.iloc[outbound_date_row_index, outbound_date_column_index + 1]   
-
-
-        # ==============================================================================================
 
         item_row_indices = df[df.apply(lambda row: row.astype(str).str.contains('ITEM').any(), axis=1)].index
         item_columns_indices = [i for i, col in enumerate(df.columns) if df[col].astype(str).str.contains('ITEM').any()]
@@ -63,56 +62,38 @@ if file_path:
         styleNo_columns_indices = [i for i, col in enumerate(df.columns) if df[col].astype(str).str.contains('STYLE NO').any()]
         packing_columns_indices = [i for i, col in enumerate(df.columns) if df[col].astype(str).str.contains('PACKING').any()]
         baleNo_columns_indices = [i for i, col in enumerate(df.columns) if df[col].astype(str).str.contains('Bale No.').any()]
-        shippingMark_columns_indices = [i for i, col in enumerate(df.columns) if df[col].astype(str).str.contains('S/M').any()]
-
-        totalQty_columns_indices = [i for i, col in enumerate(df.columns) if df[col].astype(str).str.contains("Total Q'ty").any()]
 
         buyer_column_index = buyer_columns_indices[0]
         color_column_index = color_columns_indices[0]
         styleNo_column_index = styleNo_columns_indices[0]
         packing_column_index = packing_columns_indices[0]
         baleNo_column_index = baleNo_columns_indices[0]
-        shippingMark_column_index = shippingMark_columns_indices[0]
-        totalQty_column_index = totalQty_columns_indices[0]
 
-        # 6개 속성에 대해 데이터 구하기
+        # 5개 속성에 대해 데이터 구하기
         buyer_data = df.iloc[row_start_index:row_end_index, buyer_column_index]
         color_data = df.iloc[row_start_index:row_end_index, color_column_index]
         styleNo_data = df.iloc[row_start_index:row_end_index,styleNo_column_index]
         packing_data = df.iloc[row_start_index:row_end_index, packing_column_index]
         baleNo_data = df.iloc[row_start_index:row_end_index, baleNo_column_index]
-        shippingMark_data = df.iloc[row_start_index:row_end_index, shippingMark_column_index]
-
-
-        totalQty_data = df.iloc[row_start_index:row_end_index, totalQty_column_index]
         
 
-        # baleNo 빈 곳 채우기 & 똥갈이 df 만들기
-        seperate_amount_lst = []
         for k in range(len(baleNo_data)):
             i = k + row_start_index
             if pd.isna(baleNo_data[i]):
                 baleNo_data[i] = (baleNo_data[i - 1])
             baleNo_data[i] = str(baleNo_data[i])
+        
 
-            if totalQty_data[i] % 100 != 0 and pd.notna(totalQty_data[i]):
-                num = totalQty_data[i] % 100
-                lst = [customer_info, item_data[i], color_data[i], num]
-                seperate_amount_lst.append(lst)
-
-        seperate_amount_columns = ['CUSTOMER', 'ITEM', 'COLOR', "Q'TY"]
-        seperate_amount_df = pd.DataFrame(data=seperate_amount_lst, columns=seperate_amount_columns)
 
         data = []
         for k in range(len(item_data)):
             i = k + row_start_index
-            lst = [buyer_data[i], item_data[i], color_data[i], styleNo_data[i], packing_data[i], baleNo_data[i], shippingMark_data[i]]
+            lst = [buyer_data[i], item_data[i], color_data[i], styleNo_data[i], packing_data[i], baleNo_data[i]]
             data.append(lst)
 
-        columns = ['BUYER', 'ITEM', 'COLOR', 'STYLE NO', 'PACKING', 'Bale No.', 'S/M']
+        columns = ['BUYER', 'ITEM', 'COLOR', 'STYLE NO', 'PACKING', 'Bale No.']
         new_df = pd.DataFrame(data=data, columns=columns)
 
-        # print(new_df)
         
         
         # 병합된 셀 리스트
@@ -221,7 +202,6 @@ if file_path:
             styleNo_lst = []
             packing_lst = []
             baleNo_lst = []
-            shippingMark_lst = []
 
             
             for index in lst:
@@ -242,9 +222,6 @@ if file_path:
 
                 if new_df['Bale No.'][index] not in baleNo_lst:
                     baleNo_lst.append(new_df['Bale No.'][index])
-                
-                if new_df['S/M'][index] not in shippingMark_lst:
-                    shippingMark_lst.append(new_df['S/M'][index])
 
 
             buyer_str = remove_duplicates_function(buyer_lst)
@@ -252,10 +229,9 @@ if file_path:
             color_str = remove_duplicates_function(color_lst)
             styleNo_str = remove_duplicates_function(styleNo_lst)
             baleNo_str = remove_duplicates_function(baleNo_lst)
-            shippingMark_str = remove_duplicates_function(shippingMark_lst)
 
             
-            final_lst.append([buyer_str, item_str, color_str, styleNo_str, packing_lst, baleNo_str, shippingMark_str])
+            final_lst.append([buyer_str, item_str,color_str, styleNo_str, packing_lst, baleNo_str])
 
 
 
@@ -263,116 +239,54 @@ if file_path:
 
         for i in final_lst:
             for bale in i[4]:
-                lst = [i[0], i[1], i[2], i[3], bale, i[5], i[6]]
+                lst = [i[0], i[1], i[2], i[3], bale, i[5]]
                 new_data.append(lst)
 
 
         result_df = pd.DataFrame(data=new_data, columns=columns)
-        
-        print(customer_info)
-        year = outbound_date_info.year
-        month = outbound_date_info.month
-        day = outbound_date_info.day - 1
+        result_df = result_df.transpose()
 
-        folder_name = str(year) + "-" + str(month) + "-" + str(day) + "_출고_" + customer_info
-
-
-        
         print(result_df)
+        # 첫 번째 행을 컬럼으로 추가
+        result_df.insert(0, ' ', result_df.index)
         
-        rows_as_lists1 = result_df.values.tolist()
-        for index, row_lst in enumerate(rows_as_lists1):
-            inner_lst = [customer_info]
-            for data in row_lst:
-                inner_lst.append(data)
-            rows_as_lists1[index] = inner_lst
+
+
+
+        lst = ['  ']
+        for i in range(len(result_df.columns)):
+            if i > 0:
+                lst.append(i)
+
+        result_df.columns = lst
+
         
-        rows_as_lists2 = seperate_amount_df.values.tolist()
+        def add_dataframe_to_excel(existing_file, new_sheet_name, new_dataframe):
+        # Excel 파일 열기
+            with pd.ExcelWriter(existing_file, engine='openpyxl', mode='a') as writer:
+                # DataFrame을 새로운 시트로 추가
+                new_dataframe.to_excel(writer, sheet_name=new_sheet_name, index=False)
 
-        # print(all_rows_as_one_list)
+                # 엑셀 시트 객체 가져오기
+                sheet = writer.sheets[new_sheet_name]
 
-        def get_day_of_week(day_of_week):
-    
-            days = ["월요일", "화요일", "수요일", "목요일", "금요일", "토요일", "일요일"]
-            day_name = days[day_of_week]
+                # 인덱스 값에 볼드 스타일 적용
+                for cell in sheet['A']:
+                    cell.font = Font(bold=True)
 
-            return day_name
-        
-        date_object = datetime(year, month, day)
-        day_of_week = date_object.weekday()
+                sheet['A1'].alignment = Alignment(horizontal='left')
 
-        day_name = get_day_of_week(day_of_week)
+        existing_excel_file = output_file_path
 
-        def create_excel_table_with_columns(file_path, columns):
-            # 엑셀 워크북 및 워크시트 생성
-            workbook = openpyxl.Workbook()
-            worksheet = workbook.active
+        # 기존 Excel 파일 경로 및 시트 이름 설정
+        existing_excel_file = output_file_path
+        new_sheet_name = '쉽핑마크 데이터'
 
-            # 헤더(컬럼) 추가
-            for col_num, column in enumerate(columns, 1):
-                cell = worksheet.cell(row=1, column=col_num, value=column)
-                cell.font = Font(bold=True)
+        # 함수 호출하여 새로운 시트에 데이터프레임 추가
+        add_dataframe_to_excel(existing_excel_file, new_sheet_name, result_df)
 
-            # 엑셀 파일 저장
-            workbook.save(file_path)
-
-
-        def write_data(wpath, data):
-            try:
-                workbook = openpyxl.load_workbook(wpath)
-            except FileNotFoundError:
-                workbook = openpyxl.Workbook()
-
-            worksheet = workbook.active
-
-            for row_number, row_data in enumerate(data, start=worksheet.max_row):
-                row_data_with_number = [row_number] + row_data
-                worksheet.append(row_data_with_number)
-
-            last_row = worksheet.max_row
-            for col in worksheet.iter_cols(min_row=last_row, max_row=last_row):
-                for cell in col:
-                    cell.border = Border(bottom=Side(style='thin'))
-
-            workbook.save(wpath)
-
-        def create_folder(path):
-            try:
-                columns = ['NO.', 'CUSTOMER_INFO', 'BUYER', 'ITEM', 'COLOR', 'STYLE NO', 'PACKING', 'Bale No.', 'S/M']
-                # 폴더 생성
-                os.makedirs(path)
-                print(f"폴더가 성공적으로 생성되었습니다. 경로: {path}")
-                excel_file_path1 = r"C:\\Users\\bnj30\Desktop\\출고서류\\" + str(year) + "년\\" + str(year) + "년 " + str(month) + "월\\" + str(year) + "년 " + str(month) + "월 " + str(day) + "일 [" + day_name + "]\\" + str(year) + "년 " + str(month) + "월 " + str(day) + "일 [" + day_name + "]_출고.xlsx"
-                write_data(excel_file_path1, rows_as_lists1)
-                
-                excel_file_path2 = r"C:\\Users\\bnj30\Desktop\\출고서류\\" + str(year) + "년\\" + str(year) + "년 " + str(month) + "월\\" + str(year) + "년 " + str(month) + "월 " + str(day) + "일 [" + day_name + "]\\" + str(year) + "년 " + str(month) + "월 " + str(day) + "일 [" + day_name + "]_똥갈이.xlsx"
-                write_data(excel_file_path2, rows_as_lists2)
-
-                excel_file_name = os.path.basename(file_path).split('.')
-
-                inner_excel_path = path + "\\" + excel_file_name[0] + "_쉽핑마크_데이터.xlsx"
-                create_excel_table_with_columns(inner_excel_path, columns)
-                write_data(inner_excel_path, rows_as_lists1)
-            except FileExistsError:
-                print(f"폴더가 이미 존재합니다. 경로: {path}")
-            except Exception as e:
-                print(f"폴더 생성 중 오류가 발생했습니다. 오류 내용: {e}")
-
-
-        folder_path = r"C:\\Users\\bnj30\Desktop\\출고서류\\" + str(year) + "년\\" + str(year) + "년 " + str(month) + "월\\" + str(year) + "년 " + str(month) + "월 " + str(day) + "일 [" + day_name + "]\\" + folder_name
-        create_folder(folder_path)
-
-
-        directory_path = os.path.dirname(file_path)
-
-        if __name__ == '__main__':
-            shutil.copytree(
-                directory_path,
-                folder_path,
-                dirs_exist_ok=True
-            )
-
-
+        print(f"Dataframe added to {existing_excel_file} under sheet {new_sheet_name}")
+   
     except Exception as e:
         print(f"파일 열기 오류: {str(e)}")
 else:
